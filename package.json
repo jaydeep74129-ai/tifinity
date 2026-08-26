@@ -1,8 +1,8 @@
 {
-  "name": "tifinity-web",
+  "name": "tifinity",
   "private": true,
   "version": "1.0.0",
   "dependencies": {
-    "@vercel/blob": "latest"
+    "@vercel/blob": "^2.0.0"
   }
 }
