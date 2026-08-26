@@ -1,0 +1,26 @@
+{
+  "name": "Tifinity \u2014 Local Food & Tiffin",
+  "short_name": "Tifinity",
+  "description": "Tifinity local food, restaurants, tiffin subscriptions and delivery platform.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fffaf0",
+  "theme_color": "#0f8f87",
+  "lang": "en-IN",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
