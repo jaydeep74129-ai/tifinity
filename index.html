@@ -81,6 +81,12 @@ html{font-size:clamp(15px,3.75vw,17px)}body{line-height:1.42;letter-spacing:-.00
 .snake-overlay{position:fixed;inset:0;z-index:55;pointer-events:none;display:none}.snake-overlay.active{display:block}.snake-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.snake-hud{position:absolute;top:78px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;background:rgba(58,20,65,.92);color:#fff;font-size:11px;font-weight:900;box-shadow:0 8px 22px rgba(50,10,60,.25);pointer-events:none}.snake-score{color:#d7a3ff}.snake-exit{position:absolute;top:82px;right:12px;border:0;border-radius:12px;padding:8px 10px;background:#7d2118;color:#fff8e5;font-weight:900;box-shadow:0 6px 16px rgba(70,15,10,.25);pointer-events:auto}.snake-controls{position:absolute;bottom:88px;left:50%;transform:translateX(-50%);display:grid;grid-template-columns:54px 54px 54px;grid-template-rows:54px 54px;gap:7px;pointer-events:auto;filter:drop-shadow(0 8px 14px rgba(0,0,0,.2))}.snake-controls button{border:2px solid #d4a64e;border-radius:15px;background:linear-gradient(145deg,#8f2018,#b94925);color:#fff6d8;font-size:22px;font-weight:900;box-shadow:0 4px 0 #65150f}.snake-controls button:active{transform:translateY(3px);box-shadow:0 1px 0 #65150f}.snake-controls .up{grid-column:2}.snake-controls .left{grid-column:1;grid-row:2}.snake-controls .down{grid-column:2;grid-row:2}.snake-controls .right{grid-column:3;grid-row:2}.snake-tip{position:absolute;top:112px;left:50%;transform:translateX(-50%);padding:5px 9px;border-radius:10px;background:rgba(255,248,225,.9);color:#612018;font-size:10px;font-weight:800;white-space:nowrap;pointer-events:none}.snake-diamond{filter:drop-shadow(0 0 8px rgba(180,80,255,.9))}
 
 .codebox{margin-top:10px;padding:14px;border:1px dashed #b8860b;border-radius:14px;background:linear-gradient(135deg,#fff8df,#f6ead0);font-size:1.1rem;letter-spacing:1.5px;text-align:center;color:#6b3a1e}
+
+.call-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:10px}
+.call-tools button{min-height:44px;border-radius:12px;font-weight:800;border:1px solid #bfeef5;background:#effcff;color:#008fa8}
+.call-tools button.active{background:#0f8f87;color:#fff;border-color:#0f8f87}
+.call-meter{margin-top:10px;background:#f5f7f6;border-radius:12px;padding:9px 11px;font-size:.78rem;color:#5d6663}
+.call-meter b{color:#17201f}.call-error{background:#fff1f0;border-color:#f0c7c4;color:#9d2c24}
 </style>
 
 <style id="hyperforge-final-touch-fix">
@@ -610,52 +616,189 @@ let tifCallPollTimer=null,tifCallCleanupTimer=null,tifActiveCallId='',tifPC=null
 function callCloudReady(){return !!(state.supabaseConfig?.enabled&&supabaseUrl()&&supabaseKey())}
 function callSelfKey(){const me=chatIdentity();return me.role+':'+me.id}
 function callPeerKey(contact){return contact.role+':'+contact.id}
-function callMakeId(){return 'call_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)}
-async function callCloudRead(){if(!callCloudReady())return null;try{const rows=await supabaseFetch('/rest/v1/tifinity_state?select=data,payload,updated_at&id=eq.main&limit=1');const row=Array.isArray(rows)?rows[0]:rows;const remote=row?.data||row?.payload;if(!remote)return null;state.chatCalls={...(state.chatCalls||{}),...(remote.chatCalls||{})};return remote.chatCalls||{}}catch(e){return null}}
-async function callCloudWrite(callId,patch){if(!callCloudReady())return false;try{const rows=await supabaseFetch('/rest/v1/tifinity_state?select=data,payload&id=eq.main&limit=1');const row=Array.isArray(rows)?rows[0]:rows;const remote=row?.data||row?.payload;if(!remote)return false;const calls={...(remote.chatCalls||{})};const current={...(calls[callId]||{}),...patch};calls[callId]=current;remote.chatCalls=calls;const payload={id:'main',payload:remote,data:remote,updated_at:new Date().toISOString(),device_id:state.supabaseConfig.deviceId};await supabaseFetch('/rest/v1/tifinity_state?on_conflict=id',{method:'POST',body:JSON.stringify(payload),headers:{Prefer:'resolution=merge-duplicates,return=representation'}});state.chatCalls={...(state.chatCalls||{}),[callId]:current};return true}catch(e){return false}}
+function callMakeId(){return 'call_'+Date.now()+'_'+Math.random().toString(36).slice(2,9)}
+async function callCloudRead(){
+  if(!callCloudReady())return null;
+  try{
+    const rows=await supabaseFetch('/rest/v1/tifinity_state?select=data,payload,updated_at&id=eq.main&limit=1');
+    const row=Array.isArray(rows)?rows[0]:rows; const remote=row?.data||row?.payload;
+    if(!remote)return null;
+    state.chatCalls={...(state.chatCalls||{}),...(remote.chatCalls||{})};
+    return remote.chatCalls||{};
+  }catch(e){return null}
+}
+async function callCloudWrite(callId,patch){
+  if(!callCloudReady())return false;
+  try{
+    const rows=await supabaseFetch('/rest/v1/tifinity_state?select=data,payload&id=eq.main&limit=1');
+    const row=Array.isArray(rows)?rows[0]:rows; const remote=row?.data||row?.payload;
+    if(!remote)return false;
+    const calls={...(remote.chatCalls||{})};
+    const current={...(calls[callId]||{}),...patch,updatedAt:new Date().toISOString()};
+    calls[callId]=current; remote.chatCalls=calls;
+    const payload={id:'main',payload:remote,data:remote,updated_at:new Date().toISOString(),device_id:state.supabaseConfig.deviceId};
+    await supabaseFetch('/rest/v1/tifinity_state?on_conflict=id',{method:'POST',body:JSON.stringify(payload),headers:{Prefer:'resolution=merge-duplicates,return=representation'}});
+    state.chatCalls={...(state.chatCalls||{}),[callId]:current}; return true;
+  }catch(e){console.error('callCloudWrite',e);return false}
+}
 function callUiStatus(text){const el=document.getElementById('tifCallStatus');if(el)el.innerHTML=text}
 function callStopPolling(){if(tifCallPollTimer){clearInterval(tifCallPollTimer);tifCallPollTimer=null}}
-function callStartPolling(){callStopPolling();tifCallPollTimer=setInterval(()=>{if(tifActiveCallId)callRefresh(tifActiveCallId)},1200)}
-function callShowAudio(){let a=document.getElementById('tifCallAudio');if(!a){a=document.createElement('audio');a.id='tifCallAudio';a.autoplay=true;a.playsInline=true;a.style.display='none';document.body.appendChild(a)}return a}
+function callStartPolling(){callStopPolling();tifCallPollTimer=setInterval(()=>{if(tifActiveCallId)callRefresh(tifActiveCallId)},700)}
+function callShowAudio(){
+  let a=document.getElementById('tifCallAudio');
+  if(!a){a=document.createElement('audio');a.id='tifCallAudio';a.autoplay=true;a.playsInline=true;a.setAttribute('playsinline','');a.style.display='none';document.body.appendChild(a)}
+  return a;
+}
+function callRing(start=true){
+  try{
+    if(!start){if(window.tifRingOsc){window.tifRingOsc.stop();window.tifRingOsc=null}return}
+    if(window.tifRingOsc)return;
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+    const ac=window.tifRingCtx||new AC();window.tifRingCtx=ac;
+    if(ac.state==='suspended')ac.resume().catch(()=>{});
+    const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.value=720;g.gain.value=.035;o.connect(g);g.connect(ac.destination);
+    const pulse=setInterval(()=>{try{o.frequency.value=o.frequency.value===720?880:720}catch(e){}},450);
+    o.onended=()=>clearInterval(pulse);o.start();window.tifRingOsc=o;
+  }catch(e){}
+}
+function callShowTools(){
+  const sheet=document.getElementById('sheet'); if(!sheet)return;
+  if(!sheet.querySelector('#tifCallTools')){
+    const box=document.createElement('div');box.id='tifCallTools';box.className='call-tools';
+    box.innerHTML='<button type="button" id="tifMuteBtn" onclick="callToggleMute()">🎙 Mute</button><button type="button" id="tifSpeakerBtn" onclick="callToggleSpeaker()">🔊 Speaker</button><button type="button" onclick="callHangup()">☎ End</button>';
+    const actions=sheet.querySelector('.call-actions');(actions||sheet.lastElementChild)?.after(box);
+  }
+}
+async function callSetSpeaker(on){
+  const a=document.getElementById('tifCallAudio');if(!a)return;
+  try{
+    if(typeof a.setSinkId==='function'){await a.setSinkId(on?'default':'default')}
+    a.volume=1;
+    a.dataset.speaker=on?'on':'off';
+  }catch(e){toast('Speaker routing is controlled by your device')}
+}
+function callToggleSpeaker(){
+  const a=document.getElementById('tifCallAudio');const on=a?.dataset.speaker!=='on';
+  callSetSpeaker(on);const b=document.getElementById('tifSpeakerBtn');if(b){b.classList.toggle('active',on);b.textContent=on?'🔊 Speaker ON':'🔈 Speaker'}
+}
+function callToggleMute(){
+  if(!tifPC)return;
+  const tracks=tifPC.getSenders().map(s=>s.track).filter(t=>t?.kind==='audio');
+  const muted=tracks.some(t=>!t.enabled);tracks.forEach(t=>t.enabled=muted);
+  const b=document.getElementById('tifMuteBtn');if(b){b.classList.toggle('active',!muted);b.textContent=muted?'🎙 Mute':'🔇 Muted'}
+  toast(muted?'Microphone unmuted':'Microphone muted');
+}
 async function callCreatePeer(call){
   if(tifPC){try{tifPC.close()}catch(e){}}
-  tifPC=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
+  const servers=[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'},
+    {urls:'stun:stun.cloudflare.com:3478'}
+  ];
+  tifPC=new RTCPeerConnection({iceServers:servers,bundlePolicy:'max-bundle',rtcpMuxPolicy:'require'});
   tifCallRemoteIceSeen=new Set();tifCallLocalIce=[];
-  tifPC.ontrack=e=>{const a=callShowAudio();a.srcObject=e.streams[0];a.play?.().catch(()=>{})};
-  tifPC.onicecandidate=e=>{if(e.candidate){tifCallLocalIce.push({candidate:e.candidate.candidate,sdpMid:e.candidate.sdpMid,sdpMLineIndex:e.candidate.sdpMLineIndex});clearTimeout(tifCallWriteTimer);tifCallWriteTimer=setTimeout(()=>callCloudWrite(call.id,{[tifCallRole==='caller'?'callerIce':'calleeIce']:tifCallLocalIce.slice()}),120)}};
-  const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});stream.getTracks().forEach(t=>tifPC.addTrack(t,stream));
-  return tifPC;
+  const a=callShowAudio();a.autoplay=true;a.playsInline=true;a.volume=1;a.dataset.speaker='on';
+  tifPC.ontrack=e=>{if(e.streams?.[0])a.srcObject=e.streams[0];a.play().catch(()=>{callUiStatus('🔊 Tap Speaker to start audio')})};
+  tifPC.onicecandidate=e=>{
+    if(!e.candidate)return;
+    tifCallLocalIce.push({candidate:e.candidate.candidate,sdpMid:e.candidate.sdpMid,sdpMLineIndex:e.candidate.sdpMLineIndex});
+    clearTimeout(tifCallWriteTimer);
+    tifCallWriteTimer=setTimeout(()=>callCloudWrite(call.id,{[tifCallRole==='caller'?'callerIce':'calleeIce']:tifCallLocalIce.slice()}),150);
+  };
+  tifPC.onconnectionstatechange=()=>{
+    const st=tifPC?.connectionState;
+    if(st==='connected'){callUiStatus('<span class="call-pulse"></span> Connected — <b>Live Audio</b>');callStartQualityMonitor(call.id)}
+    else if(st==='connecting')callUiStatus('<span class="call-pulse"></span> Connecting…');
+    else if(st==='disconnected')callUiStatus('⚠️ Connection interrupted — reconnecting…');
+    else if(st==='failed')callUiStatus('<span class="call-pulse"></span> Connection failed — checking network…');
+  };
+  tifPC.oniceconnectionstatechange=()=>{if(tifPC?.iceConnectionState==='failed'){try{tifPC.restartIce()}catch(e){}}};
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},video:false});
+  stream.getTracks().forEach(t=>tifPC.addTrack(t,stream));return tifPC;
+}
+function callStartQualityMonitor(callId){
+  clearInterval(window.tifQualityTimer);
+  window.tifQualityTimer=setInterval(async()=>{
+    if(!tifPC||!tifActiveCallId)return;
+    try{
+      const stats=await tifPC.getStats();let rtt=0,loss=0;
+      stats.forEach(x=>{if(x.type==='candidate-pair'&&x.state==='succeeded')rtt=Math.round((x.currentRoundTripTime||0)*1000);if(x.type==='inbound-rtp'&&x.kind==='audio')loss=Number(x.packetsLost||0)});
+      const el=document.getElementById('tifCallQuality');if(el)el.innerHTML=`Network: <b>${rtt&&rtt<180?'Good':rtt&&rtt<350?'Fair':'Checking…'}</b>${rtt?` · ${rtt}ms RTT`:''}`;
+    }catch(e){}
+  },1800);
+}
+function callStopQualityMonitor(){clearInterval(window.tifQualityTimer);window.tifQualityTimer=null}
+function callRenderControls(statusHtml,name,showAccept=false,callId=''){
+  openModal(`<button type="button" class="close" onclick="${showAccept?`callDecline('${esc(callId)}')`:`callHangup('${esc(callId)}')`}">✕</button><h2>📞 Internet Call</h2><div id="tifCallStatus" class="call-status">${statusHtml}</div><div id="tifCallQuality" class="call-meter">Network: <b>Checking…</b></div>${showAccept?`<div class="call-actions"><button type="button" class="call-danger" onclick="callDecline('${esc(callId)}')">✕ Decline</button><button type="button" class="call-accept" onclick="callAccept('${esc(callId)}')">✓ Accept</button></div>`:`<div class="call-actions"><button type="button" class="call-danger" onclick="callHangup('${esc(callId)}')">☎ End Call</button><button type="button" class="call-mute" onclick="callToggleMute()">🎙 Mute</button></div><div class="call-tools"><button type="button" id="tifMuteBtn" onclick="callToggleMute()">🎙 Mute</button><button type="button" id="tifSpeakerBtn" onclick="callToggleSpeaker()">🔊 Speaker</button><button type="button" onclick="callHangup('${esc(callId)}')">☎ End</button></div>`}`);
+  if(showAccept)callRing(true);else callRing(true);
 }
 async function callStart(threadId){
   if(!window.RTCPeerConnection||!navigator.mediaDevices?.getUserMedia)return toast('Internet calling is not supported on this device/browser');
-  if(!callCloudReady())return toast('Cloud connection is required for internet calling');
+  if(!callCloudReady())return toast('Internet calling needs your existing Supabase cloud sync to be ON');
   const contact=findChatParticipant(threadId);if(!contact)return toast('Chat contact unavailable');
-  try{await callCloudRead();const existing=Object.values(state.chatCalls||{}).find(c=>c&&['ringing','connecting','connected'].includes(c.status)&&((c.from===callSelfKey()&&c.to===callPeerKey(contact))||(c.to===callSelfKey()&&c.from===callPeerKey(contact))));if(existing)return toast('A call is already active');
-    const call={id:callMakeId(),threadId,from:callSelfKey(),to:callPeerKey(contact),fromName:chatIdentity().name,toName:contact.name,status:'ringing',createdAt:new Date().toISOString(),callerIce:[],calleeIce:[]};state.chatCalls[call.id]=call;tifActiveCallId=call.id;tifCallRole='caller';
-    openModal(`<button type="button" class="close" onclick="callHangup('${call.id}')">✕</button><h2>📞 Internet Call</h2><div id="tifCallStatus" class="call-status"><span class="call-pulse"></span> Calling <b>${esc(contact.name)}</b>…</div><div class="call-actions"><button type="button" class="call-danger" onclick="callHangup('${call.id}')">End Call</button><button type="button" class="call-mute" onclick="callToggleMute()">🎙 Mute</button></div>`);
-    await callCloudWrite(call.id,call);await callCreatePeer(call);const offer=await tifPC.createOffer({offerToReceiveAudio:true});await tifPC.setLocalDescription(offer);await callCloudWrite(call.id,{offer:{type:offer.type,sdp:offer.sdp},status:'ringing'});callStartPolling();
-  }catch(e){console.error(e);await callHangup(tifActiveCallId,true);toast(e.name==='NotAllowedError'?'Microphone permission was denied':'Could not start internet call')}
+  try{
+    await callCloudRead();
+    const existing=Object.values(state.chatCalls||{}).find(c=>c&&['ringing','connecting','connected'].includes(c.status)&&((c.from===callSelfKey()&&c.to===callPeerKey(contact))||(c.to===callSelfKey()&&c.from===callPeerKey(contact))));
+    if(existing)return toast('A call is already active');
+    const call={id:callMakeId(),threadId,from:callSelfKey(),to:callPeerKey(contact),fromName:chatIdentity().name,toName:contact.name,status:'ringing',createdAt:new Date().toISOString(),callerIce:[],calleeIce:[]};
+    state.chatCalls[call.id]=call;tifActiveCallId=call.id;tifCallRole='caller';
+    callRenderControls('<span class="call-pulse"></span> Calling <b>'+esc(contact.name)+'</b>…','',false,call.id);
+    await callCloudWrite(call.id,call);await callCreatePeer(call);
+    const offer=await tifPC.createOffer({offerToReceiveAudio:true});await tifPC.setLocalDescription(offer);
+    await callCloudWrite(call.id,{offer:{type:offer.type,sdp:offer.sdp},status:'ringing'});
+    callStartPolling();
+    setTimeout(()=>{if(tifActiveCallId===call.id&&state.chatCalls?.[call.id]?.status==='ringing'){toast('No answer');callHangup(call.id)}},45000);
+  }catch(e){console.error(e);await callHangup(tifActiveCallId,true);toast(e.name==='NotAllowedError'?'Microphone permission was denied. Allow microphone access and try again.':'Could not start internet call')}
 }
 async function callAccept(callId){
   const call=state.chatCalls?.[callId];if(!call||call.to!==callSelfKey())return;
   if(!window.RTCPeerConnection||!navigator.mediaDevices?.getUserMedia)return toast('Internet calling is not supported on this device/browser');
-  try{tifActiveCallId=callId;tifCallRole='callee';openModal(`<button type="button" class="close" onclick="callHangup('${callId}')">✕</button><h2>📞 Internet Call</h2><div id="tifCallStatus" class="call-status"><span class="call-pulse"></span> Connecting to <b>${esc(call.fromName||'Caller')}</b>…</div><div class="call-actions"><button type="button" class="call-danger" onclick="callHangup('${callId}')">End Call</button><button type="button" class="call-mute" onclick="callToggleMute()">🎙 Mute</button></div>`);await callCreatePeer(call);await tifPC.setRemoteDescription(call.offer);const answer=await tifPC.createAnswer({offerToReceiveAudio:true});await tifPC.setLocalDescription(answer);await callCloudWrite(callId,{answer:{type:answer.type,sdp:answer.sdp},status:'connecting'});callStartPolling()}catch(e){console.error(e);await callHangup(callId,true);toast(e.name==='NotAllowedError'?'Microphone permission was denied':'Could not accept call')}
+  try{
+    callRing(false);tifActiveCallId=callId;tifCallRole='callee';
+    callRenderControls('<span class="call-pulse"></span> Connecting to <b>'+esc(call.fromName||'Caller')+'</b>…','',false,callId);
+    await callCreatePeer(call);if(!call.offer)throw new Error('Caller offer not available');
+    await tifPC.setRemoteDescription(call.offer);
+    const answer=await tifPC.createAnswer({offerToReceiveAudio:true});await tifPC.setLocalDescription(answer);
+    await callCloudWrite(callId,{answer:{type:answer.type,sdp:answer.sdp},status:'connecting'});callStartPolling();
+  }catch(e){console.error(e);await callHangup(callId,true);toast(e.name==='NotAllowedError'?'Microphone permission was denied. Allow microphone access.':'Could not accept call')}
 }
-async function callRefresh(callId){const calls=await callCloudRead();const call=calls?.[callId]||state.chatCalls?.[callId];if(!call)return;
-  if(call.status==='ended'||call.status==='declined'){if(tifActiveCallId===callId){callUiStatus(call.status==='declined'?'Call declined':'Call ended');setTimeout(()=>callHangup(callId,true),600)}return}
-  if(tifCallRole==='caller'&&tifPC){if(call.answer&&!tifPC.currentRemoteDescription){try{await tifPC.setRemoteDescription(call.answer);await callCloudWrite(callId,{status:'connected'})}catch(e){}}
+async function callRefresh(callId){
+  const calls=await callCloudRead();const call=calls?.[callId]||state.chatCalls?.[callId];if(!call)return;
+  if(call.status==='ended'||call.status==='declined'){
+    if(tifActiveCallId===callId){callRing(false);callUiStatus(call.status==='declined'?'❌ Call declined':'☎ Call ended');setTimeout(()=>callHangup(callId,true),500)}return;
+  }
+  if(tifCallRole==='caller'&&tifPC){
+    if(call.answer&&!tifPC.currentRemoteDescription){try{await tifPC.setRemoteDescription(call.answer);await callCloudWrite(callId,{status:'connected'})}catch(e){console.error(e)}}
     for(const c of (call.calleeIce||[])){const k=JSON.stringify(c);if(!tifCallRemoteIceSeen.has(k)&&tifPC.remoteDescription){try{await tifPC.addIceCandidate(c);tifCallRemoteIceSeen.add(k)}catch(e){}}}
   }
-  if(tifCallRole==='callee'&&tifPC){if(call.status==='ended')return;for(const c of (call.callerIce||[])){const k=JSON.stringify(c);if(!tifCallRemoteIceSeen.has(k)&&tifPC.remoteDescription){try{await tifPC.addIceCandidate(c);tifCallRemoteIceSeen.add(k)}catch(e){}}}}
-  if(call.status==='connected')callUiStatus('<span class="call-pulse"></span> Connected — '+esc(call.to===callSelfKey()?call.fromName:call.toName));
+  if(tifCallRole==='callee'&&tifPC){
+    for(const c of (call.callerIce||[])){const k=JSON.stringify(c);if(!tifCallRemoteIceSeen.has(k)&&tifPC.remoteDescription){try{await tifPC.addIceCandidate(c);tifCallRemoteIceSeen.add(k)}catch(e){}}}
+  }
+  if(call.status==='connected')callUiStatus('<span class="call-pulse"></span> Connected — <b>Live Audio</b>');
 }
-async function callHangup(callId,silent=false){const id=callId||tifActiveCallId;if(id&&callCloudReady()){try{await callCloudWrite(id,{status:'ended',endedAt:new Date().toISOString()})}catch(e){}}callStopPolling();if(tifPC){try{tifPC.getSenders().forEach(s=>s.track?.stop());tifPC.close()}catch(e){}tifPC=null}const a=document.getElementById('tifCallAudio');if(a){try{a.srcObject=null}catch(e){}}if(tifActiveCallId===id)tifActiveCallId='';if(!silent&&document.getElementById('modal')?.classList.contains('show'))closeModal()}
-function callToggleMute(){if(!tifPC)return;const tracks=tifPC.getSenders().map(s=>s.track).filter(Boolean);const muted=tracks.some(t=>t.kind==='audio'&&!t.enabled);tracks.filter(t=>t.kind==='audio').forEach(t=>t.enabled=muted);toast(muted?'Microphone unmuted':'Microphone muted')}
-async function callCheckIncoming(){if(!callCloudReady()||tifActiveCallId)return;const calls=await callCloudRead();const me=callSelfKey();const incoming=Object.values(calls||{}).filter(c=>c&&c.to===me&&c.status==='ringing').sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt))[0];if(!incoming)return;const age=Date.now()-new Date(incoming.createdAt||0).getTime();if(age>60000)return;
-  tifActiveCallId=incoming.id;openModal(`<button type="button" class="close" onclick="callDecline('${incoming.id}')">✕</button><h2>📞 Incoming Internet Call</h2><div class="call-status"><span class="call-pulse"></span> <b>${esc(incoming.fromName||'Tifinity User')}</b> is calling…</div><div class="call-actions"><button type="button" class="call-danger" onclick="callDecline('${incoming.id}')">Decline</button><button type="button" class="call-accept" onclick="callAccept('${incoming.id}')">Accept</button></div>`);
+async function callHangup(callId,silent=false){
+  const id=callId||tifActiveCallId;callRing(false);callStopPolling();callStopQualityMonitor();
+  if(id&&callCloudReady()){try{await callCloudWrite(id,{status:'ended',endedAt:new Date().toISOString()})}catch(e){}}
+  if(tifPC){try{tifPC.getSenders().forEach(s=>s.track?.stop());tifPC.close()}catch(e){}tifPC=null}
+  const a=document.getElementById('tifCallAudio');if(a){try{a.pause();a.srcObject=null}catch(e){}}
+  if(tifActiveCallId===id)tifActiveCallId='';
+  if(!silent&&document.getElementById('modal')?.classList.contains('show'))closeModal();
 }
-async function callDecline(callId){await callCloudWrite(callId,{status:'declined',endedAt:new Date().toISOString()});tifActiveCallId='';closeModal()}
-function callStartMonitor(){clearInterval(tifCallCleanupTimer);tifCallCleanupTimer=setInterval(()=>{callCheckIncoming()},1500)}
+async function callCheckIncoming(){
+  if(!callCloudReady()||tifActiveCallId)return;
+  const calls=await callCloudRead();const me=callSelfKey();
+  const incoming=Object.values(calls||{}).filter(c=>c&&c.to===me&&c.status==='ringing').sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt))[0];
+  if(!incoming)return;
+  const age=Date.now()-new Date(incoming.createdAt||0).getTime();if(age>45000){await callCloudWrite(incoming.id,{status:'missed',endedAt:new Date().toISOString()});return}
+  tifActiveCallId=incoming.id;tifCallRole='callee';
+  callRenderControls('<span class="call-pulse"></span> <b>'+esc(incoming.fromName||'Tifinity User')+'</b> is calling…','',true,incoming.id);
+}
+async function callDecline(callId){
+  callRing(false);
+  if(callId&&callCloudReady())await callCloudWrite(callId,{status:'declined',endedAt:new Date().toISOString()});
+  tifActiveCallId='';closeModal();
+}
+function callStartMonitor(){clearInterval(tifCallCleanupTimer);tifCallCleanupTimer=setInterval(()=>{callCheckIncoming()},1000)}
 function openChatThread(threadId){const me=chatIdentity(),contact=findChatParticipant(threadId);if(!contact)return toast('Chat contact is no longer available');const msgs=state.chatMessages.filter(m=>m.threadId===threadId).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));msgs.forEach(m=>{if(String(m.to)===me.role+':'+me.id)m.read=true});persistLocalOnly();const html=msgs.length?msgs.map(m=>`<div class=\"chat-bubble ${String(m.from)===me.role+':'+me.id?'me':'them'}\"><div>${esc(m.body)}</div><div class=\"chat-time\">${new Date(m.createdAt).toLocaleString('en-IN')}</div></div>`).join(''):'<div class=\"chat-empty\">Start the conversation. Include an order ID or problem details when useful.</div>';openModal(`<button type=\"button\" class=\"close\" onclick=\"closeModal()\">✕</button><h2>💬 ${esc(contact.name)}</h2><p class=\"muted\">${esc(contact.role)}</p><div class=\"chat-actions\"><button type=\"button\" class=\"chat-call\" onclick=\"callStart(\'${esc(threadId)}\')\">📞 Internet Call</button></div><div id=\"chatThread\" class=\"chat-thread\">${html}</div><div class=\"chat-compose\"><textarea id=\"chatMessageInput\" placeholder=\"Type your message...\" maxlength=\"1000\" onkeydown=\"if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage('${esc(threadId)}')}\"></textarea><button type=\"button\" class=\"chat-send\" onclick=\"sendChatMessage('${esc(threadId)}')\">➤</button></div>`);setTimeout(()=>{const el=document.getElementById('chatThread');if(el)el.scrollTop=el.scrollHeight;document.getElementById('chatMessageInput')?.focus()},60)}
 function sendChatMessage(threadId){const input=document.getElementById('chatMessageInput'),body=String(input?.value||'').trim();if(!body)return;const me=chatIdentity(),contact=findChatParticipant(threadId);if(!contact)return toast('Chat contact unavailable');const msg={id:makeId('msg'),threadId,from:me.role+':'+me.id,to:contact.role+':'+contact.id,fromName:me.name,toName:contact.name,body,createdAt:new Date().toISOString(),read:false};state.chatMessages.push(msg);persist();addNotification(chatTarget(contact),'New Chat Message',me.name+': '+body.slice(0,120),'',threadId);input.value='';openChatThread(threadId)}
 function openChatFromNotification(threadId){if(threadId)openChatThread(threadId)}
@@ -1742,7 +1885,7 @@ function exitSnakeGame(){if(!snakeGame)return;cancelAnimationFrame(snakeGame.raf
 window.startSnakeGame=startSnakeGame;window.snakeTurn=snakeTurn;window.exitSnakeGame=exitSnakeGame;
 function speakTifinityWelcome(){if(_welcomeSpoken)return;_welcomeSpoken=true;try{if(window.AndroidTifinity&&AndroidTifinity.speakWelcome)AndroidTifinity.speakWelcome('टिफिनिटी में थारो हार्दिक स्वागत है।');}catch(e){}}
 window.handleNativeOrderAction=handleNativeOrderAction;window.createTifinityBackup=createTifinityBackup;window.restoreTifinitySafetyBackup=restoreTifinitySafetyBackup;window.tifinityDataSafety=tifinityDataSafety;window.tifinitySmartDashboard=tifinitySmartDashboard;window.tifinityExceptionCenter=tifinityExceptionCenter;window.speakTifinityWelcome=speakTifinityWelcome;window.openChatFromNotification=openChatFromNotification;window.openChatCenter=openChatCenter;window.openChatThread=openChatThread;window.sendChatMessage=sendChatMessage;
-window.tiffinSubscriptionAdmin=tiffinSubscriptionAdmin;window.openTiffinSubscriptionAdmin=openTiffinSubscriptionAdmin;window.adminWallets=adminWallets;window.adminWalletAction=adminWalletAction;window.saveAdminWalletAction=saveAdminWalletAction;window.adminWalletHistory=adminWalletHistory;window.adminGiftVouchers=adminGiftVouchers;window.editAdminGiftVoucher=editAdminGiftVoucher;window.saveAdminGiftVoucher=saveAdminGiftVoucher;window.toggleAdminGiftVoucher=toggleAdminGiftVoucher;window.deleteAdminGiftVoucher=deleteAdminGiftVoucher;window.subscriptionPlansPage=subscriptionPlansPage;window.scheduleNativeTiffinNotifications=scheduleNativeTiffinNotifications;window.buyTiffinPlan=buyTiffinPlan;window.activateTiffinSubscription=activateTiffinSubscription;window.auth=auth;window.partnerSelect=partnerSelect;window.doLogin=doLogin;window.sendEmailOtp=sendEmailOtp;window.verifyEmailOtp=verifyEmailOtp;window.adminLoginClick=adminLoginClick;window.forgot=forgot;window.tifinityHandleBack=tifinityHandleBack;window.supabaseConfiguration=supabaseConfiguration;window.saveSupabaseConfig=saveSupabaseConfig;window.cloudTest=cloudTest;window.cloudPush=cloudPush;window.cloudPull=cloudPull;window.callStart=callStart;window.callAccept=callAccept;window.callHangup=callHangup;window.callDecline=callDecline;window.callToggleMute=callToggleMute;
+window.tiffinSubscriptionAdmin=tiffinSubscriptionAdmin;window.openTiffinSubscriptionAdmin=openTiffinSubscriptionAdmin;window.adminWallets=adminWallets;window.adminWalletAction=adminWalletAction;window.saveAdminWalletAction=saveAdminWalletAction;window.adminWalletHistory=adminWalletHistory;window.adminGiftVouchers=adminGiftVouchers;window.editAdminGiftVoucher=editAdminGiftVoucher;window.saveAdminGiftVoucher=saveAdminGiftVoucher;window.toggleAdminGiftVoucher=toggleAdminGiftVoucher;window.deleteAdminGiftVoucher=deleteAdminGiftVoucher;window.subscriptionPlansPage=subscriptionPlansPage;window.scheduleNativeTiffinNotifications=scheduleNativeTiffinNotifications;window.buyTiffinPlan=buyTiffinPlan;window.activateTiffinSubscription=activateTiffinSubscription;window.auth=auth;window.partnerSelect=partnerSelect;window.doLogin=doLogin;window.sendEmailOtp=sendEmailOtp;window.verifyEmailOtp=verifyEmailOtp;window.adminLoginClick=adminLoginClick;window.forgot=forgot;window.tifinityHandleBack=tifinityHandleBack;window.supabaseConfiguration=supabaseConfiguration;window.saveSupabaseConfig=saveSupabaseConfig;window.cloudTest=cloudTest;window.cloudPush=cloudPush;window.cloudPull=cloudPull;window.callStart=callStart;window.callAccept=callAccept;window.callHangup=callHangup;window.callDecline=callDecline;window.callToggleMute=callToggleMute;window.callToggleSpeaker=callToggleSpeaker;window.callCheckIncoming=callCheckIncoming;
 async function loadLiveData(){syncCustomerData();if(window.TIFINITY_DATA_URL){try{let r=await fetch(window.TIFINITY_DATA_URL);if(!r.ok)throw 0;let d=await r.json();DATA={...DATA,...d}}catch(e){toast('Live data connection unavailable')}}render()}
 window.addEventListener('popstate',()=>{try{history.pushState({tifinity:true},'','#tifinity');tifinityHandleBack()}catch(e){tifinityHandleBack()}});
 try{history.replaceState({tifinity:true},'','#tifinity')}catch(e){}
