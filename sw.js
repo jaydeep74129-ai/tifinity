@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tifinity-v2';
+const CACHE_NAME = 'tifinity-v3-runtime-hardening';
 
 const CORE_ASSETS = [
   './',
@@ -7,7 +7,8 @@ const CORE_ASSETS = [
   './favicon.png',
   './icon-192.png',
   './icon-512.png',
-  './apple-touch-icon.png'
+  './apple-touch-icon.png',
+  './tifinity-runtime-patch.js'
 ];
 
 self.addEventListener('install', event => {
@@ -21,55 +22,43 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys =>
-        Promise.all(
-          keys
-            .filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
-        )
-      )
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
 
+async function latestHtml(request) {
+  try {
+    const response = await fetch(request, { cache: 'no-store' });
+    if (!response.ok) return response;
+    const type = response.headers.get('content-type') || '';
+    if (!type.includes('text/html')) return response;
+    const text = await response.text();
+    const marker = 'tifinity-runtime-patch.js';
+    const patched = text.includes(marker)
+      ? text
+      : text.replace(/<\/body>/i, '<script src="./tifinity-runtime-patch.js?v=20260826" defer></script></body>');
+    const headers = new Headers(response.headers);
+    headers.set('Cache-Control', 'no-store');
+    headers.set('X-Tifinity-Runtime', '2026-08-26-runtime-hardening-1');
+    return new Response(patched, { status: response.status, statusText: response.statusText, headers });
+  } catch (e) {
+    return caches.match(request).then(r => r || caches.match('./index.html'));
+  }
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-
   const url = new URL(event.request.url);
-
-  // HTML pages: ALWAYS prefer latest network version.
-  if (
-    event.request.mode === 'navigate' ||
-    url.pathname.endsWith('/index.html') ||
-    url.pathname === '/'
-  ) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, copy);
-          });
-          return response;
-        })
-        .catch(() => caches.match(event.request).then(r => r || caches.match('./index.html')))
-    );
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname === '/') {
+    event.respondWith(latestHtml(event.request));
     return;
   }
-
-  // Other assets: cache first, then network.
   event.respondWith(
-    caches.match(event.request)
-      .then(cached => {
-        if (cached) return cached;
-
-        return fetch(event.request).then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, copy);
-          });
-          return response;
-        });
-      })
+    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+      return response;
+    }))
   );
 });
