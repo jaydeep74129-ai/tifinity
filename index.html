@@ -2182,35 +2182,7 @@ setInterval(()=>{
     }
   }catch(e){}
 },1500);
-pageBackStack=[];modalStack=[];modalBackSteps=0;
-/* FINAL SAFE BOOT: normalize persisted state before first render. */
-try{
-  if(!state||typeof state!=='object') state={...defaultState};
-  if(!Array.isArray(state.cart)) state.cart=[];
-  if(!Array.isArray(state.orders)) state.orders=[];
-  if(!Array.isArray(state.favs)) state.favs=[];
-  if(!Array.isArray(state.restaurants)) state.restaurants=[];
-  if(!Array.isArray(state.customers)) state.customers=[];
-  if(!Array.isArray(state.adminUsers)) state.adminUsers=[];
-  if(!Array.isArray(state.managerUsers)) state.managerUsers=[];
-  if(!Array.isArray(state.deliveryPartners)) state.deliveryPartners=[];
-  if(!Array.isArray(state.notifications)) state.notifications=[];
-  if(!Array.isArray(state.chatMessages)) state.chatMessages=[];
-  if(!state.marketplace||typeof state.marketplace!=='object') state.marketplace=buildMarketplace();
-  if(!Array.isArray(state.marketplace.categories)||
-     !Array.isArray(state.marketplace.stores)||
-     !Array.isArray(state.marketplace.products)||
-     !Array.isArray(state.marketplace.offers)){
-    state.marketplace=buildMarketplace();
-  }
-}catch(e){console.error('Tifinity safe boot normalization failed',e)}
-try{loadLiveData()}catch(e){
-  console.error('Tifinity initial render failed',e);
-  try{
-    const app=document.getElementById('app');
-    if(app) app.innerHTML='<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center"><div><div style="font-size:54px">🍱</div><h2>Tifinity</h2><p>Loading your app…</p><button onclick="location.reload()" style="padding:12px 20px;border:0;border-radius:12px;background:#168f83;color:#fff">Reload</button></div></div>';
-  }catch(_){}
-}
+pageBackStack=[];modalStack=[];modalBackSteps=0;loadLiveData();
 persistLocalOnly();
 setTimeout(()=>{try{speakTifinityWelcome()}catch(e){}},900);
 setTimeout(()=>{

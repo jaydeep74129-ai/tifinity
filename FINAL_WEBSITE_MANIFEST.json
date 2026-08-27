@@ -1,0 +1,11 @@
+{
+  "release": "Tifinity Final Website Package",
+  "final_html": "index.html",
+  "service_worker": "sw.js",
+  "main_logo": "logo_from_html.png",
+  "api_routes": [
+    "api/upload-apk.js",
+    "api/apk-download.js"
+  ],
+  "file_count": 18
+}
